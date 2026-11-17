@@ -1,14 +1,230 @@
 <!DOCTYPE html>
-
-<html>
+<html lang="en">
 <head>
-  <meta http-equiv="CONTENT-TYPE" content="text/html; charset=UTF-8">
-  <link rel="stylesheet" href="styles/style.css"/>
-  <title>Hello, World!</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>🛡️ CAMPUS MESH SOS — Resilient Off-Grid Safety</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --card: #131a26;
+      --border: #233047;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --danger: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.35);
+      --safe: #10b981;
+      --accent: #38bdf8;
+      --warn: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 14px; max-width: 540px; margin: 0 auto; line-height: 1.4; }
+    header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+    header h1 { font-size: 1.15rem; display: flex; align-items: center; gap: 6px; }
+    .badge { font-size: 0.72rem; font-weight: 700; padding: 4px 8px; border-radius: 999px; background: rgba(16, 185, 129, 0.15); color: var(--safe); border: 1px solid var(--safe); }
+    .badge.offline { background: rgba(245, 158, 11, 0.15); color: var(--warn); border-color: var(--warn); }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+    .card-title { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); font-weight: 700; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .row { display: flex; gap: 8px; margin-bottom: 10px; }
+    select, input[type="text"] { width: 100%; background: #0d131d; color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 0.9rem; outline: none; }
+    select:focus, input[type="text"]:focus { border-color: var(--accent); }
+    .gps-status { font-size: 0.8rem; color: var(--accent); background: rgba(56, 189, 248, 0.1); padding: 8px 10px; border-radius: 8px; border: 1px dashed rgba(56, 189, 248, 0.3); }
+    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    button { border: none; border-radius: 10px; padding: 13px 12px; font-weight: 700; font-size: 0.92rem; cursor: pointer; }
+    button:active { transform: scale(0.97); }
+    .btn-sos { background: var(--danger); color: white; box-shadow: 0 0 18px var(--danger-glow); grid-column: span 2; font-size: 1.05rem; padding: 16px; }
+    .btn-med { background: #f59e0b; color: #0b0f17; }
+    .btn-safe { background: var(--safe); color: #0b0f17; }
+    .role-toggle { display: flex; gap: 6px; margin-bottom: 10px; }
+    .role-btn { flex: 1; padding: 8px; font-size: 0.8rem; background: #0d131d; color: var(--muted); border: 1px solid var(--border); }
+    .role-btn.active-student { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border-color: var(--danger); }
+    .role-btn.active-responder { background: rgba(56, 189, 248, 0.2); color: #7dd3fc; border-color: var(--accent); }
+    .chat-box { height: 210px; overflow-y: auto; background: #090d14; border: 1px solid var(--border); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+    .msg { max-width: 85%; padding: 8px 11px; border-radius: 10px; font-size: 0.86rem; word-wrap: break-word; }
+    .msg.student { align-self: flex-start; background: #1e293b; border-left: 3px solid var(--danger); }
+    .msg.responder { align-self: flex-end; background: #0c2d48; border-right: 3px solid var(--accent); }
+    .msg-meta { font-size: 0.68rem; color: var(--muted); margin-bottom: 3px; font-weight: 600; }
+    .chat-input-row { display: flex; gap: 8px; }
+    .btn-send { background: var(--accent); color: #0b0f17; padding: 0 16px; white-space: nowrap; }
+    .ledger { max-height: 170px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+    .packet { background: #0d131d; border: 1px solid var(--border); border-left: 4px solid var(--danger); padding: 9px 11px; border-radius: 8px; font-size: 0.82rem; }
+    .packet.safe-pkt { border-left-color: var(--safe); }
+    .packet.med-pkt { border-left-color: var(--warn); }
+    .packet-top { display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 3px; }
+    .hop-pill { background: #1e293b; color: var(--accent); padding: 1px 6px; border-radius: 4px; font-size: 0.7rem; }
+    footer { text-align: center; font-size: 0.72rem; color: var(--muted); margin-top: 8px; padding-bottom: 16px; }
+  </style>
 </head>
 <body>
-  <h1>
-    Hello, World!
-  </h1>
+  <header>
+    <h1>🛡️ CAMPUS MESH SOS</h1>
+    <span id="netBadge" class="badge">MESH RELAY ACTIVE</span>
+  </header>
+  <div class="card">
+    <div class="card-title">
+      <span>Device Node Identity</span>
+      <span id="nodeIdDisplay" style="color: var(--accent);">NODE-0000</span>
+    </div>
+    <div class="row">
+      <select id="zoneSelect">
+        <option value="Engineering Block - Floor 2">Zone: Engineering Block - Floor 2</option>
+        <option value="Main Library - Basement">Zone: Main Library - Basement</option>
+        <option value="Science Lecture Theatre">Zone: Science Lecture Theatre</option>
+        <option value="Student Hostel Wing B">Zone: Student Hostel Wing B</option>
+        <option value="Main Auditorium / Fiesta Hall">Zone: Main Auditorium / Fiesta Hall</option>
+      </select>
+    </div>
+    <div id="gpsBox" class="gps-status">📡 Acquiring offline satellite GPS...</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Zero-Network Distress Broadcast</div>
+    <div class="btn-grid">
+      <button class="btn-sos" onclick="triggerBeacon('SOS EMERGENCY')">🚨 BROADCAST SOS DISTRESS</button>
+      <button class="btn-med" onclick="triggerBeacon('MEDICAL AID')">🏥 MEDICAL HELP</button>
+      <button class="btn-safe" onclick="triggerBeacon('MARKED SAFE')">✅ I AM SAFE</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">
+      <span>Two-Way Responder Help Chat</span>
+      <span style="font-size: 0.68rem; color: var(--safe);">LIVE CROSS-DEVICE</span>
+    </div>
+    <div class="role-toggle">
+      <button id="btnStudent" class="role-btn active-student" onclick="setRole('student')">🎓 Student in Distress</button>
+      <button id="btnResponder" class="role-btn" onclick="setRole('responder')">🛡️ Security / Medical</button>
+    </div>
+    <div id="chatBox" class="chat-box">
+      <div class="msg responder">
+        <div class="msg-meta">🛡️ Campus Security Dispatch • System Ready</div>
+        Mesh relay online. Select your role above and send a live message across connected devices.
+      </div>
+    </div>
+    <div class="chat-input-row">
+      <input type="text" id="chatInput" placeholder="Type emergency update or responder instruction..." onkeypress="handleKey(event)" />
+      <button class="btn-send" onclick="sendChat()">Send</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">
+      <span>Live Mesh Packet Ledger (Multi-Hop)</span>
+      <span id="pktCount">0 Packets</span>
+    </div>
+    <div id="ledger" class="ledger">
+      <div style="color: var(--muted); font-size: 0.82rem; text-align: center; padding: 14px;">Waiting for SOS beacons or peer relays...</div>
+    </div>
+  </div>
+  <footer>Built with Open Web Standards, Geolocation APIs & Decentralized Mesh Routing Logic.</footer>
+  <script>
+    const nodeId = "NODE-" + Math.floor(1000 + Math.random() * 9000);
+    document.getElementById("nodeIdDisplay").textContent = nodeId;
+    const seenPackets = new Set();
+    const MAX_HOPS = 8;
+    let currentRole = "student";
+    let gpsCoords = "Indoor Zone Fallback Active";
+    let packetTotal = 0;
+
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => { gpsCoords = `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`; document.getElementById("gpsBox").textContent = `🛰️ GPS Locked: ${gpsCoords}`; },
+        () => { document.getElementById("gpsBox").textContent = `🏢 Concrete/Indoor Mode: Using Campus Zone Tag`; },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    }
+
+    const TOPIC_SOS = "primeuni/campusmesh/2026/sos";
+    const TOPIC_CHAT = "primeuni/campusmesh/2026/chat";
+    let client = null;
+    try {
+      client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
+      client.on("connect", () => {
+        document.getElementById("netBadge").textContent = "MESH BRIDGE CONNECTED";
+        document.getElementById("netBadge").classList.remove("offline");
+        client.subscribe(TOPIC_SOS); client.subscribe(TOPIC_CHAT);
+      });
+      client.on("offline", () => {
+        document.getElementById("netBadge").textContent = "LOCAL P2P / OFFLINE MODE";
+        document.getElementById("netBadge").classList.add("offline");
+      });
+      client.on("message", (topic, message) => {
+        const data = JSON.parse(message.toString());
+        if (topic === TOPIC_SOS) receivePacket(data);
+        else if (topic === TOPIC_CHAT) renderChatMessage(data);
+      });
+    } catch(e) {
+      document.getElementById("netBadge").textContent = "LOCAL P2P / OFFLINE MODE";
+      document.getElementById("netBadge").classList.add("offline");
+    }
+
+    const localChannel = new BroadcastChannel("campus_mesh_local");
+    localChannel.onmessage = (event) => {
+      if (event.data.type === "sos") receivePacket(event.data.payload);
+      if (event.data.type === "chat") renderChatMessage(event.data.payload);
+    };
+
+    function triggerBeacon(alertType) {
+      const zone = document.getElementById("zoneSelect").value;
+      const packet = { id: `${nodeId}-${Date.now()}`, sender: nodeId, type: alertType, zone: zone, gps: gpsCoords, hops: 1, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) };
+      receivePacket(packet);
+      localChannel.postMessage({ type: "sos", payload: packet });
+      if (client && client.connected) client.publish(TOPIC_SOS, JSON.stringify(packet));
+      const autoMsg = { id: `chat-${Date.now()}`, sender: nodeId, role: "student", zone: zone, text: `🚨 [${alertType}] triggered at ${zone} (${gpsCoords})`, time: packet.time };
+      renderChatMessage(autoMsg);
+      localChannel.postMessage({ type: "chat", payload: autoMsg });
+      if (client && client.connected) client.publish(TOPIC_CHAT, JSON.stringify(autoMsg));
+    }
+
+    function receivePacket(pkt) {
+      if (seenPackets.has(pkt.id) || pkt.hops > MAX_HOPS) return;
+      seenPackets.add(pkt.id);
+      const displayHops = pkt.sender === nodeId ? 1 : Math.min(pkt.hops + 1, MAX_HOPS);
+      const ledger = document.getElementById("ledger");
+      if (packetTotal === 0) ledger.innerHTML = "";
+      packetTotal++;
+      document.getElementById("pktCount").textContent = `${packetTotal} Packet${packetTotal > 1 ? "s" : ""}`;
+      const div = document.createElement("div");
+      div.className = "packet";
+      if (pkt.type.includes("SAFE")) div.classList.add("safe-pkt");
+      if (pkt.type.includes("MEDICAL")) div.classList.add("med-pkt");
+      div.innerHTML = `<div class="packet-top"><span>${pkt.type} • ${pkt.sender}</span><span class="hop-pill">HOP ${displayHops}/${MAX_HOPS}</span></div><div style="color: #cbd5e1;">📍 ${pkt.zone}</div><div style="color: var(--muted); font-size: 0.74rem; margin-top: 2px;">🛰️ ${pkt.gps} • 🕒 ${pkt.time}</div>`;
+      ledger.prepend(div);
+    }
+
+    function setRole(role) {
+      currentRole = role;
+      document.getElementById("btnStudent").className = role === "student" ? "role-btn active-student" : "role-btn";
+      document.getElementById("btnResponder").className = role === "responder" ? "role-btn active-responder" : "role-btn";
+    }
+
+    function handleKey(e) { if (e.key === "Enter") sendChat(); }
+
+    function sendChat() {
+      const input = document.getElementById("chatInput");
+      const text = input.value.trim();
+      if (!text) return;
+      const zone = document.getElementById("zoneSelect").value;
+      const msgObj = { id: `chat-${nodeId}-${Date.now()}`, sender: nodeId, role: currentRole, zone: zone, text: text, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) };
+      renderChatMessage(msgObj);
+      localChannel.postMessage({ type: "chat", payload: msgObj });
+      if (client && client.connected) client.path ? client.publish(TOPIC_CHAT, JSON.stringify(msgObj)) : client.publish(TOPIC_CHAT, JSON.stringify(msgObj));
+      input.value = "";
+    }
+
+    function renderChatMessage(msg) {
+      if (seenPackets.has(msg.id)) return;
+      seenPackets.add(msg.id);
+      const chatBox = document.getElementById("chatBox");
+      const div = document.createElement("div");
+      div.className = `msg ${msg.role === "responder" ? "responder" : "student"}`;
+      const label = msg.role === "responder" ? `🛡️ Security/Med (${msg.sender})` : `🎓 Student (${msg.sender} • ${msg.zone.split("-")[0].trim()})`;
+      div.innerHTML = `<div class="msg-meta">${label} • ${msg.time}</div><div>${escapeHTML(msg.text)}</div>`;
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function escapeHTML(str) {
+      return str.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+    }
+  </script>
 </body>
 </html>
